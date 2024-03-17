@@ -1,75 +1,61 @@
 """
-Комплексные числа - числа вида a + bi, где a, b - вещественные числа, i - мнимая
-единица, то есть число, для которого выполняется равенство i**2 == -1.
-
-В этом задании вам потребуется реализовать класс Complex, экземпляры которого
-представляют собой комплексные числа.
+Реализуйте класс Complex, экземпляры которого представляют собой комплексные
+числа.
 
 Конструктор Complex принимает два параметра: real, отражающий вещественную часть
 числа, и imag, отражающий множитель числа i. Оба параметра должны поддерживать
-позиционные и ключевые аргументы и иметь значение по умолчанию 0:
-
-Complex()                   # эквивалентно 0+0i 
-Complex(1)                  # эквивалентно 1+0i 
-Complex(1, 2)               # эквивалентно 1+2i
-Complex(imag=3)             # эквивалентно 0+3i
-Complex(pos=-2, imag=-5)    # эквивалентно -2+(-5i)
+позиционные и ключевые аргументы и иметь значение по умолчанию 0.
 
 Экземпляры Complex должны поддерживать следующие операции:
 
-- сложение (+)
-- вычитание (-)
-- умножение (*)
-- деление (/)
-- проверка равенства (==, !=)
+- сложение (+),
+- вычитание (-),
+- умножение (*),
+- деление (/),
+- проверка равенства (==, !=).
+
+Результатом всех операций (кроме == и !=) должны быть новые экземпляры Complex,
+старые экземпляры при этом не должны изменяться.
 
 Эти операции должны поддерживаться между любыми экземплярами Complex или
-встроенных типов int и float.
+встроенных типов int и float вне зависимости от порядка аргументов. Примеры
+допустимых операций:
 
-Вывод экземпляра 
+>>> 1 + Complex(1, 2)
+Complex(2, 2)
 
-Справка:
+>>> Complex(3, 4) - 0.5
+Complex(2.5, 4) 
 
-Пусть (a + bi) и (c + di) - комплексные числа, тогда cложение и вычитание этих
-чисел определяются так:
+>>> 3 / Complex(-2, 1)
+Complex(-1.2, -0.6)
 
-    (a + bi) + (c + di) == (a + c) + (b + d)i
+>>> Complex(5, 1) * Complex(0.4, 0.3)
+Complex(1.7, 1.9)
 
-    (a + bi) - (c + di) == (a - c) + (b - d)i
+>>> 7.7 == Complex(real=7.7)
+True
 
-Так как любое вещественное число r представимо в виде комплексного с
-коэффициентом 0 перед мнимой едининцей, аналогичные операции между комплексными
-числами определяются так:
+>>> -1 == Complex(real=-1, imag=4)
+False
 
-    (a + bi) + (r + 0i) == (a + r) + bi
+Строковое представление экземпляров Complex должно иметь вид "a+bi" при
+положительных b. При отрицательных знак "+" опускается. Примеры:
 
-    (a + bi) - (r + 0i) == (a - r) + bi
+>>> print(Complex())
+0+0i
 
-Произведение комплексных чисел:
+>>> print(Complex(1))
+1+0i
 
-    (a + bi) * (c + di) == ac + bci + adi + bdi**2
-                        == ac + bdi**2 + bci + adi
-                        == (ac - bd) + (bc + ad)i
+>>> print(Complex(1, 2))
+1+2i
 
-для вещественных чисел:
-
-    (a + bi) * (r + 0i) == r(a + bi) == ar + bri
-
-Деление комплексных чисел:
-
-    (a + bi) / (c + di) == ((a + bi)(c - di)) / ((c + di)(c - di))
-                        == ((a + bi)(c - di)) / (c**2 + d**2)
-                        == (ac + bd) / (c**2 + d**2) + ((bc - ad) / (c**2 + d**2)) * i
-
-для вещественных чисел:
-
-    (a + bi) / (r + 0i) == ar / r**2 + (br / r**2) * i
-                        == a/r + (b/r)i
-
-
+>>> print(Complex(-1, -2))
+-1-2i
 """
 
-from __future__ import annotations
+from __future__ import annotations  # игнорируйте эту строку
 
 
 class Complex:
@@ -88,12 +74,24 @@ class Complex:
 
         return NotImplemented
 
+    def __radd__(self, other) -> Complex:
+        return self + other
+
     def __sub__(self, other) -> Complex:
         if isinstance(other, (int, float)):
             return Complex(self.real - other, self.imag)
 
         if isinstance(other, Complex):
             return Complex(self.real - other.real, self.imag - other.imag)
+
+        return NotImplemented
+
+    def __rsub__(self, other) -> Complex:
+        if isinstance(other, (int, float)):
+            return Complex(other - self.real, -self.imag)
+
+        if isinstance(other, Complex):
+            return Complex(other.real - self.real, other.imag - self.imag)
 
         return NotImplemented
 
@@ -114,6 +112,9 @@ class Complex:
 
         return NotImplemented
 
+    def __rmul__(self, other):
+        return self * other
+
     def __truediv__(self, other) -> Complex:
         if isinstance(other, (int | float)):
             return Complex(self.real / other, self.imag / other)
@@ -131,8 +132,43 @@ class Complex:
 
         return NotImplemented
 
+    def __rtruediv__(self, other) -> Complex:
+        c, d = self.real, self.imag
+
+        if isinstance(other, (int | float)):
+            a, b = other, 0
+        elif isinstance(other, Complex):
+            a, b = other.real, other.imag
+        else:
+            return NotImplemented
+
+        # (a + bi) / (c + di)   == ((a + bi)(c - di)) / ((c + di)(c - di))
+        #                       == ((a + bi)(c - di)) / (cc + dd)
+        #                       == (ac + bd)/(cc + dd) + (bc - ad)/(cc + dd)
+        return Complex(
+            real=(a * c + b * d) / (c**2 + d**2),
+            imag=(b * c - a * d) / (c**2 + d**2),
+        )
+
+    def __eq__(self, other) -> bool:
+        if isinstance(other, (int, float)):
+            return self.real == other and self.imag == 0
+
+        if isinstance(other, Complex):
+            return self.real == other.real and self.imag == other.imag
+
+        return NotImplemented
+
     def __str__(self) -> str:
-        imag_str = f"{self.imag}i"
-        if self.imag < 0:
-            imag_str = f"({imag_str})"
-        return f"{self.real}+{imag_str}"
+        real = self.real
+        if isinstance(real, float) and real.is_integer():
+            real = int(real)
+        imag = self.imag
+        if isinstance(imag, float) and imag.is_integer():
+            imag = int(imag)
+        imag_str = f"{imag}i"
+        if self.imag >= 0:
+            imag_str = f"+{imag_str}"
+        return f"{real}{imag_str}"
+
+    __repr__ = __str__
