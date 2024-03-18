@@ -54,7 +54,7 @@ def rand_op() -> Callable[[Any, Any], Any]:
     )
 
 
-def num_to_complex(num: int | float | complex) -> Complex:
+def num_to_custom(num: int | float | complex) -> Complex:
     if isinstance(num, (int, float)):
         return Complex(num)
     return Complex(real=num.real, imag=num.imag)
@@ -65,13 +65,13 @@ def run_case(
 ):
     if b == 0 and op is operator.truediv:
         with pytest.raises(ZeroDivisionError):
-            op(num_to_complex(a), b)
+            op(num_to_custom(a), b)
             return
 
-    _as = (num_to_complex(a),) if isinstance(a, complex) else (a, num_to_complex(a))
-    _bs = (num_to_complex(b),) if isinstance(b, complex) else (b, num_to_complex(b))
+    _as = (num_to_custom(a),) if isinstance(a, complex) else (a, num_to_custom(a))
+    _bs = (num_to_custom(b),) if isinstance(b, complex) else (b, num_to_custom(b))
 
-    expected = num_to_complex(op(a, b))
+    expected = num_to_custom(op(a, b))
 
     for _a, _b in itertools.product(_as, _bs):
         actual = op(_a, _b)
