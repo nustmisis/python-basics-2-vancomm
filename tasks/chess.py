@@ -17,11 +17,10 @@
 >>> print(Pawn("white", 1, 2))
 white pawn @ A2
 
->>> print(Queen("black", 5, 8))
-black queen @ E8
+>>> print(King("black", 5, 8))
+black king @ E8
 
->>> # следующий пример выбросит исключение, игнорируйте комментарий
->>> print(Knight("red", 2, 1))  # doctest: +IGNORE_EXCEPTION_DETAIL
+>>> print(Knight("red", 2, 1))              # doctest: +IGNORE_EXCEPTION_DETAIL
 Traceback (most recent call last):
     ...
 ValueError: ...
@@ -36,46 +35,59 @@ ValueError: ...
 
 - move(self, file, rank): изменяет текущее положение фигуры, "перемещая" ее на
   новый столбец file и новую строку rank. В случае, фигура не может
-  переместиться на новое положение (например, слоны двигаются только по
-  диагонали), метод должен выбрасывать исключение ValueError. В случае успеха
-  метод ничего не возвращает.
+  переместиться на новое положение (например, король двигается только на одну
+  клетку в любом направлении), метод должен выбрасывать исключение ValueError. В
+  случае успеха метод ничего не возвращает.
 
->>> b = Bishop("white", 3, 1)
->>> b.move(4, 2)
->>> b.position()
-(4, 2)
->>> b.move(4, 2)  # doctest: +IGNORE_EXCEPTION_DETAIL
+>>> p = Pawn("white", 1, 2)
+>>> p.move(1, 4)
+>>> p.position()
+(1, 4)
+>>> p.move(1, 3)                            # doctest: +IGNORE_EXCEPTION_DETAIL
 Traceback (most recent call last):
     ...
 ValueError: ...
->>> b.position()
-(4, 2)
->>> b.move(8, 6)
->>> b.position()
-(8, 6)
+>>> p.position()
+(1, 4)
+>>> p.move(1, 5)
+>>> p.position()
+(1, 5)
 
 - moves(self): возвращает список всех ходов (новых позиций), доступных для
   фигуры из текущей позиции. Порядок ходов может быть любым.
 
->>> q = Queen("white", 4, 4)
->>> sorted(q.moves())
-[(1, 3), (1, 3), (2, 2), (2, 2), (3, 1), (3, 1), (4, 1), (4, 2), (4, 3), (4, 4), (4, 5), (4, 5), (4, 6), (4, 6), (4, 7), (4, 7), (4, 8), (4, 8), (5, 1), (5, 1), (6, 2), (6, 2), (7, 3), (7, 3), (8, 4), (8, 4)]
+>>> n = Knight("white", 4, 4)
+>>> n.moves()
+[(5, 6), (5, 2), (3, 6), (3, 2), (6, 5), (6, 3), (2, 5), (2, 3)]
+
+
+
+
 """
 
 import itertools
-from abc import abstractmethod
+from typing import override
 
 
-class Piece:
-    def __init__(self, color: str, file: int, rank: int):
+class ChessEntity:
+    @staticmethod
+    def validate_square(file: int, rank: int) -> ValueError | None:
+        if not (1 <= file <= 8) or not (1 <= rank <= 8):
+            return ValueError(f"square {file}:{rank} is invalid")
+
+    @staticmethod
+    def format_square(file: int, rank: int) -> str:
+        letter = chr(ord("A") + file - 1)
+        return f"{letter}{rank}"
+
+
+class Piece(ChessEntity):
+    def __init__(self, color: str, file: int, rank: int) -> None:
         if color not in ("white", "black"):
             raise ValueError(f"color {color} not allowed")
 
-        if not (1 <= file <= 8):
-            raise ValueError(f"file {file} not allowed")
-
-        if not (1 <= rank <= 8):
-            raise ValueError(f"rank {rank} not allowed")
+        if error := self.validate_square(file, rank):
+            raise error
 
         self.color = color
         self.file = file
@@ -84,150 +96,90 @@ class Piece:
     def position(self) -> tuple[int, int]:
         return (self.file, self.rank)
 
-    @staticmethod
-    def validate_square(file: int, rank: int):
-        assert 1 <= file <= 8
-        assert 1 <= rank <= 8
+    def move(self, file: int, rank: int) -> None:
+        if error := self.validate_square(file, rank):
+            raise error
 
-    def move(self, file: int, rank: int):
-        self.validate_square(file, rank)
-        try:
-            self.validate_move(file, rank)
-        except AssertionError as e:
-            raise ValueError(e)
+        if error := self.validate_move(file, rank):
+            raise error
+
         self.file = file
         self.rank = rank
 
     def __str__(self) -> str:
-        file = chr(ord("A") + self.file - 1)
-        return f"{self.color} {type(self).__name__.lower()} @ {file}{self.rank}"
+        klass = type(self).__name__.lower()
+        square = self.format_square(self.file, self.rank)
+        return f"{self.color} {klass} @ {square}"
 
-    @abstractmethod
-    def validate_move(self, file: int, rank: int): ...
+    def validate_move(self, file: int, rank: int) -> None | Exception: ...
 
-    @abstractmethod
     def moves(self) -> list[tuple[int, int]]: ...
 
 
 class Pawn(Piece):
-    def validate_move(self, file: int, rank: int):
-        assert (
-            abs(self.file - file) <= 1
-        ), "pawn can only move straight or one square left or right"
-        assert rank - self.rank == 1, "pawn can only move 1 square forward"
+    @override
+    def validate_move(self, file: int, rank: int) -> ValueError | None:
+        df, dr = file - self.file, rank - self.rank
+        if dr <= 0:
+            return ValueError("pawn can only move forward")
+        if abs(df) > 1:
+            return ValueError("pawn can only move in the same or adjacent file")
+        if dr > 2:
+            return ValueError("pawn can only move forward 1 or 2 ranks")
+        if dr == 2 and self.rank != 2:
+            return ValueError("pawn can only move 2 ranks from rank 2")
 
-    def moves(self):
-        f, r = self.file, self.rank
-        vectors = [(-1, 1), (0, 1), (1, 1)]
+    @override
+    def moves(self) -> list[tuple[int, int]]:
+        vectors = ((-1, 1), (0, 1), (1, 1))
         moves = []
         for df, dr in vectors:
-            move = f + df, r + dr
-            try:
-                self.validate_move(*move)
-                self.validate_square(*move)
-            except Exception:
-                pass
-            else:
-                moves.append(move)
+            fp, rp = self.file + df, self.rank + dr
+            if error := self.validate_square(fp, rp):
+                continue
+            moves.append((fp, rp))
+        if self.rank == 2:
+            moves.append((self.file, self.rank + 2))
         return moves
 
 
 class Knight(Piece):
-    def validate_move(self, file: int, rank: int):
-        df = abs(self.file - file)
-        dr = abs(self.rank - rank)
-        l, g = (df, dr) if df < dr else (dr, df)
-        assert (l, g) == (1, 2), "knight only moves (1,2) or (2,1)"
+    @override
+    def validate_move(self, file: int, rank: int) -> ValueError | None:
+        df, dr = abs(file - self.file), abs(rank - self.rank)
+        vector = (df, dr) if df > dr else (dr, df)
+        if vector != (2, 1):
+            return ValueError("knight only moves (1,2) or (2,1)")
 
+    @override
     def moves(self) -> list[tuple[int, int]]:
-        f, r = self.position()
         moves = []
-        vectors = [
-            (1, 2),
-            (1, -2),
-            (-1, 2),
-            (-1, -2),
-            (2, 1),
-            (2, -1),
-            (-2, 1),
-            (-2, -1),
-        ]
+        vectors = itertools.chain(
+            itertools.product((1, -1), (2, -2)),
+            itertools.product((2, -2), (1, -1)),
+        )
         for df, dr in vectors:
-            move = f + df, r + dr
-            try:
-                self.validate_move(*move)
-                self.validate_square(*move)
-            except Exception:
-                pass
-            else:
-                moves.append(move)
+            fp, rp = self.file + df, self.rank + dr
+            if error := self.validate_square(fp, rp):
+                continue
+            moves.append((fp, rp))
         return moves
 
 
 class King(Piece):
+    @override
     def validate_move(self, file: int, rank: int):
-        f, r = self.position()
-        df, dr = abs(file - f), abs(rank - r)
-        assert (df or dr) and df <= 1 and dr <= 1
+        df, dr = abs(file - self.file), abs(rank - self.rank)
+        if not (0 <= df <= 1 and 0 <= dr <= 1 and df + dr):
+            return ValueError("king can only move 1 square in each direction")
 
+    @override
     def moves(self) -> list[tuple[int, int]]:
-        f, r = self.position()
         moves = []
-        vectors: list[tuple[int, int]] = [
-            (0, 1),
-            (1, 0),
-            (-1, 0),
-            (0, -1),
-            (1, 1),
-            (-1, -1),
-            (-1, 1),
-            (1, -1),
-        ]
+        vectors = ((i, j) for i in (-1, 0, 1) for j in (-1, 0, 1) if i or j)
         for df, dr in vectors:
-            move = f + df, r + dr
-            try:
-                self.validate_move(*move)
-                self.validate_square(*move)
-            except Exception:
-                pass
-            else:
-                moves.append(move)
+            fp, rp = self.file + df, self.rank + dr
+            if error := self.validate_square(fp, rp):
+                continue
+            moves.append((fp, rp))
         return moves
-
-
-# class Bishop(Piece):
-#     def validate_move(self, file: int, rank: int):
-#         df = abs(self.file - file)
-#         dr = abs(self.rank - rank)
-#         assert df == dr and df >= 1
-
-
-# class Rook(Piece):
-#     pass
-
-
-# class Queen(Piece):
-#     def moves(self):
-#         moves: list[tuple[int, int]] = []
-#         vectors: list[tuple[int, int]] = [
-#             (0, 1),
-#             (1, 0),
-#             (-1, 0),
-#             (0, -1),
-#             (1, 1),
-#             (-1, -1),
-#             (-1, 1),
-#             (1, -1),
-#         ]
-#         f, r = self.file, self.rank
-#         for df, dr in vectors:
-#             f, r = f + df, r + dr
-#             while True:
-#                 try:
-#                     self.validate_square(f, r)
-#                 except Exception:
-#                     break
-#                 else:
-#                     moves.append((f, r))
-#                     f, r = f + df, r + dr
-#         return moves
