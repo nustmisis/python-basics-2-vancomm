@@ -93,4 +93,5 @@ from __future__ import annotations  # игнорируйте эту строку
 
 
 class Complex:
-    pass  # удалите эту строку и введите свое решение
+    def __add__(self):
+        return NotImplemented
